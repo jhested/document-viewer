@@ -6,6 +6,9 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Protocol
 
+import aioboto3  # type: ignore[import-untyped]
+from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+
 
 class ObjectNotFound(Exception):
     """Object key does not exist in the backing store."""
@@ -52,3 +55,43 @@ def _sha256_etag(path: Path) -> str:
         while chunk := f.read(64 * 1024):
             h.update(chunk)
     return f"sha256:{h.hexdigest()}"
+
+
+class S3Backend:
+    def __init__(
+        self,
+        *,
+        bucket: str,
+        region: str,
+        endpoint_url: str | None,
+        access_key_id: str | None = None,
+        secret_access_key: str | None = None,
+    ) -> None:
+        self._bucket = bucket
+        self._session = aioboto3.Session(
+            region_name=region,
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=secret_access_key,
+        )
+        self._endpoint = endpoint_url
+
+    async def head(self, key: str) -> str:
+        async with self._session.client("s3", endpoint_url=self._endpoint) as c:
+            try:
+                r = await c.head_object(Bucket=self._bucket, Key=key)
+            except ClientError as e:
+                if e.response["Error"]["Code"] in {"404", "NoSuchKey"}:
+                    raise ObjectNotFound(key) from e
+                raise
+        return f"s3:{r['ETag'].strip('\"')}"
+
+    async def fetch(self, key: str) -> tuple[AsyncIterator[bytes], str]:
+        etag = await self.head(key)
+
+        async def _iter() -> AsyncIterator[bytes]:
+            async with self._session.client("s3", endpoint_url=self._endpoint) as c:
+                r = await c.get_object(Bucket=self._bucket, Key=key)
+                async for chunk in r["Body"].iter_chunks(64 * 1024):
+                    yield chunk
+
+        return _iter(), etag
