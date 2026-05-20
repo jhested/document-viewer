@@ -122,8 +122,8 @@ Error bodies are intentionally sparse: `{"error": "...", "request_id": "..."}`. 
 
 | Source mime | Pipeline |
 |---|---|
-| `application/pdf` | PyMuPDF opens stream → render page N to RGB at DPI = `clamp(w / page_pt_width * 72, 72, 300)` → Pillow watermark → encode WebP (q=82, method=4) → cache |
-| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Worker POSTs source as multipart to `{GOTENBERG_URL}/forms/libreoffice/convert` with a per-request timeout → receives PDF response → PDF goes through the PDF pipeline above. Intermediate PDF cached per-JWT for the manifest TTL. |
+| `application/pdf` | **pikepdf pre-clean** (strip `/JavaScript`, `/JS`, `/EmbeddedFile`, `/EmbeddedFiles`, `/AA`, `/OpenAction`, `/Launch`, `/GoToR`, `/ImportData`, `/SubmitForm`; drop attachments; remove encryption) → PyMuPDF opens the cleaned PDF → render page N to RGB at DPI = `clamp(w / page_pt_width * 72, 72, 300)` → Pillow watermark → encode WebP (q=82, method=4) → cache. Cleaned PDF cached separately so subsequent page requests skip the clean step. |
+| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Worker POSTs source as multipart to `{GOTENBERG_URL}/forms/libreoffice/convert` with a per-request timeout → receives PDF response → PDF runs through the PDF pipeline above (pikepdf clean → PyMuPDF render). Cleaned intermediate PDF cached per-JWT for the manifest TTL. |
 | `.pptx`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf` | Same as docx — all handled by Gotenberg's LibreOffice route |
 | `image/png`, `image/jpeg`, `image/webp` | Pillow opens → strip all EXIF/metadata → re-encode WebP → watermark → cache. Single page. |
 | `image/heic` | Same, via `pillow-heif` plugin |
@@ -191,7 +191,7 @@ Backend selected via `SOURCE_BACKEND=s3|fs` env var. Adding Azure Blob / GCS lat
 - **Key:** `page:{sha256(etag || sub || n || w)}`
 - **Value:** WebP bytes.
 - **TTL:** `CACHE_TTL_SECONDS` env, default 900 (15 min).
-- **Intermediate office PDFs:** `office:{sha256(etag || jti)}` → PDF bytes, same TTL.
+- **Intermediate cleaned PDFs:** `pdf-clean:{sha256(etag || jti)}` → pikepdf-cleaned PDF bytes, same TTL. Used both for direct-PDF sources and for Gotenberg-produced PDFs after they've been cleaned. Page renders read from this entry so the clean step runs once per session.
 
 ETag-keyed: if the source object changes in MinIO/Ceph, cache misses automatically and we re-render from new content.
 
@@ -283,6 +283,7 @@ Implementation must follow **red-green-refactor**: failing test first, minimum c
 
 **Security regression corpus** (committed to repo, ~30 files):
 - Malformed PDFs (truncated, oversized streams, embedded JS, embedded files)
+- PDFs with `/JavaScript`, `/EmbeddedFile`, `/OpenAction`, `/Launch` — assert pikepdf removes them before PyMuPDF sees the file (snapshot the cleaned PDF's object tree)
 - DOCX with macros, OLE objects, external image refs
 - Zip bombs (DOCX is a zip; test the dezipper limits)
 - Image decompression bombs (pixel-flood, malformed headers)
