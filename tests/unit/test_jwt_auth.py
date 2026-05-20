@@ -3,14 +3,17 @@ from __future__ import annotations
 
 import time
 
+import fakeredis.aioredis  # type: ignore[import-not-found]
 import jwt as pyjwt
 import pytest
 
 from document_viewer.shared.jwt_auth import (
     JwtClaims,
+    JwtReplayGuard,
     JwtVerifier,
     TokenExpired,
     TokenInvalid,
+    TokenReplayed,
 )
 
 SECRET = "test-secret-that-is-long-enough-for-hs256"
@@ -80,3 +83,29 @@ def test_rejects_missing_required_claim() -> None:
     )
     with pytest.raises(TokenInvalid):
         v.verify(no_obj)
+
+
+
+@pytest.mark.asyncio
+async def test_first_use_passes_then_replay_fails() -> None:
+    redis = fakeredis.aioredis.FakeRedis()
+    guard = JwtReplayGuard(redis)
+    claims = JwtClaims(
+        iss="i", sub="s", obj="o", case="c", jti="uuid-1", iat=0, exp=int(time.time()) + 60
+    )
+    await guard.claim(claims)  # ok
+    with pytest.raises(TokenReplayed):
+        await guard.claim(claims)
+
+
+@pytest.mark.asyncio
+async def test_replay_guard_ttl_matches_token_remaining_lifetime() -> None:
+    redis = fakeredis.aioredis.FakeRedis()
+    guard = JwtReplayGuard(redis)
+    claims = JwtClaims(
+        iss="i", sub="s", obj="o", case="c", jti="uuid-2",
+        iat=int(time.time()), exp=int(time.time()) + 30,
+    )
+    await guard.claim(claims)
+    ttl = await redis.ttl(f"jti:{claims.jti}")
+    assert 25 <= ttl <= 30

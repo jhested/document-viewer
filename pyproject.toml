@@ -45,6 +45,7 @@ dev = [
     "mypy>=1.13",
     "types-redis",
     "types-Pillow",
+    "fakeredis>=2.26",
 ]
 
 [project.scripts]

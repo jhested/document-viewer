@@ -1,10 +1,12 @@
 """JWT verification — signature, expiry, issuer, claim presence."""
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import jwt as pyjwt
+import redis.asyncio as redis_async
 
 
 class TokenInvalid(Exception):
@@ -78,3 +80,16 @@ class JwtVerifier:
             iat=int(payload["iat"]),
             exp=int(payload["exp"]),
         )
+
+
+class JwtReplayGuard:
+    """SETNX-based replay protection. Records jti in Redis with TTL = remaining lifetime."""
+
+    def __init__(self, redis: redis_async.Redis[bytes]) -> None:
+        self._redis = redis
+
+    async def claim(self, claims: JwtClaims) -> None:
+        remaining = max(1, claims.exp - int(time.time()))
+        ok = await self._redis.set(f"jti:{claims.jti}", "1", ex=remaining, nx=True)
+        if not ok:
+            raise TokenReplayed(claims.jti)
