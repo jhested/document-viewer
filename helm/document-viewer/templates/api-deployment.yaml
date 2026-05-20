@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  labels: { {{- include "viewer.labels" . | nindent 4 }} }
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector: { matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: api } }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: api }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000 }
+      containers:
+        - name: api
+          image: {{ include "viewer.apiImage" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ containerPort: 8000 }]
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          env:
+            - { name: REDIS_URL, value: redis://{{ .Release.Name }}-redis:6379/0 }
+          envFrom:
+            - configMapRef: { name: {{ .Release.Name }}-config }
+            - secretRef:    { name: {{ .Release.Name }}-secrets }
+          livenessProbe:  { httpGet: { path: /healthz, port: 8000 }, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /readyz,  port: 8000 }, periodSeconds: 5 }
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
