@@ -70,3 +70,36 @@ async def manifest(
     payload = await job.result(timeout=settings.render_timeout_seconds)
     response.headers["Cache-Control"] = "no-store"
     return {**payload, "ttl_seconds": settings.cache_ttl_seconds}
+
+
+@router.get("/{jwt}/page/{n}")
+async def page(
+    jwt: str,
+    n: int,
+    settings: SettingsDep,
+    verifier: VerifierDep,
+    replay: ReplayDep,
+    arq: ArqDep,
+    w: int = 1200,
+) -> Response:
+    claims = await _claims(jwt, verifier, replay)
+    width = min(max(1, w), settings.max_page_width)
+    watermark = f"{claims.sub} - {claims.case}"
+    job = await arq.enqueue_job(
+        "render_page",
+        obj=claims.obj,
+        sub=claims.sub,
+        case=claims.case,
+        jti=claims.jti,
+        page=n,
+        width=width,
+        watermark_text=watermark,
+    )
+    if job is None:
+        raise HTTPException(status_code=503, detail="job queue unavailable")
+    webp = await job.result(timeout=settings.render_timeout_seconds)
+    return Response(
+        content=webp,
+        media_type="image/webp",
+        headers={"Cache-Control": "no-store"},
+    )

@@ -80,3 +80,32 @@ def test_manifest_returns_200_and_no_store(client: TestClient) -> None:
 def test_manifest_rejects_bad_jwt(client: TestClient) -> None:
     r = client.get("/render/not-a-jwt/manifest")
     assert r.status_code == 401
+
+
+def test_page_returns_webp_and_no_store(client: TestClient) -> None:
+    arq = client.app.dependency_overrides[get_arq_pool]()
+    arq.enqueue_job = AsyncMock(
+        return_value=MagicMock(
+            result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 ")
+        )
+    )
+    r = client.get(f"/render/{_token()}/page/1?w=800")
+    assert r.status_code == 200
+    assert r.headers["Content-Type"] == "image/webp"
+    assert r.headers["Cache-Control"] == "no-store"
+    assert r.content.startswith(b"RIFF")
+
+
+def test_page_caps_width(client: TestClient) -> None:
+    arq = client.app.dependency_overrides[get_arq_pool]()
+    captured: dict[str, object] = {}
+
+    async def _enqueue(name: str, **kwargs: object) -> MagicMock:
+        captured.update(kwargs)
+        return MagicMock(
+            result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 ")
+        )
+
+    arq.enqueue_job = AsyncMock(side_effect=_enqueue)
+    client.get(f"/render/{_token()}/page/1?w=99999")
+    assert captured["width"] <= 2400
