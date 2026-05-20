@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     s3_access_key_id: SecretStr | None = None
     s3_secret_access_key: SecretStr | None = None
-    fs_root: str = "/tmp/docs"
+    fs_root: str = "/tmp/docs"  # noqa: S108  # dev default; production must override
 
     # Worker
     gotenberg_url: str = "http://gotenberg:3000"

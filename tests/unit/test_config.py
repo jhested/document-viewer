@@ -11,7 +11,7 @@ def test_settings_loads_from_environment(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("JWT_HMAC_SECRET", "test-secret")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("SOURCE_BACKEND", "fs")
-    monkeypatch.setenv("FS_ROOT", "/tmp/docs")
+    monkeypatch.setenv("FS_ROOT", "/tmp/docs")  # noqa: S108
 
     s = Settings()
 
