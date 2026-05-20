@@ -59,6 +59,10 @@ packages = ["src/document_viewer"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["error"]
+markers = [
+    "integration: end-to-end tests that need compose.test.yaml services",
+]
+addopts = "-m 'not integration'"
 
 [tool.coverage.run]
 source = ["src/document_viewer"]
