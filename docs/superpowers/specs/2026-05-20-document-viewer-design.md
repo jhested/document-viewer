@@ -27,9 +27,9 @@ The service is a **renderer, not a viewer app.** It exposes an image API; caller
 
 ```
                  ┌──────────────────────────┐
-   nginx ──────► │  viewer-api  (FastAPI)   │ ── verifies JWT, replay-protects
-                 │  - auth, routing         │ ── cache lookup
-                 │  - serves rendered pages │ ── enqueues render jobs
+   ingress ────► │  viewer-api  (FastAPI)   │ ── verifies JWT, replay-protects
+   (nginx /      │  - auth, routing         │ ── cache lookup
+    traefik)     │  - serves rendered pages │ ── enqueues render jobs
                  │  - serves embed shell    │ ── streams pages back
                  └────────┬──────────┬──────┘
                           │          │
@@ -39,26 +39,32 @@ The service is a **renderer, not a viewer app.** It exposes an image API; caller
                                  │  - PDF/image pipeline    │ ── image re-encode (Pillow)
                                  │  - cache writes          │ ── watermarks
                                  └────────┬─────────────────┘
-                                          │
+                                          │ HTTP multipart
                                           │ (only for office formats)
                                 ┌─────────┴────────────────────┐
-                                │ viewer-office   (locked)     │ ── LibreOffice headless
-                                │ --network none, ro rootfs,   │ ── docx/xlsx/pptx/odt → PDF
-                                │ tmpfs, non-root, cap-drop    │ ── PDF returned via shared
-                                │ ALL, mem+cpu limits          │     tmpfs volume
+                                │ gotenberg  (upstream image)  │ ── gotenberg/gotenberg:8
+                                │ - office → PDF via           │ ── /forms/libreoffice/convert
+                                │   LibreOffice (internal pool)│ ── stateless HTTP
+                                │ - hardened by orchestrator:  │ ── no shared volume needed
+                                │   no egress, ro fs, no caps  │
                                 └──────────────────────────────┘
 ```
 
 **Containers:**
 
-| Container | Purpose | Network | Secrets |
-|---|---|---|---|
-| `viewer-api` | HTTP surface, JWT verify, cache lookup, embed shell | ingress (nginx), Redis | JWT verify key, Redis URL |
-| `viewer-worker` | Render pipeline, S3 fetch | Redis, S3/MinIO | S3 read creds, Redis URL |
-| `viewer-office` | LibreOffice conversion only | **none** | none |
-| `redis` | Job queue + page cache | internal | – |
+| Container | Image | Purpose | Network egress | Secrets |
+|---|---|---|---|---|
+| `viewer-api` | ours | HTTP surface, JWT verify, cache lookup, embed shell | Redis only | JWT verify key, Redis URL |
+| `viewer-worker` | ours | Render pipeline, S3 fetch, Gotenberg client | Redis, S3/MinIO, Gotenberg | S3 read creds, Redis URL |
+| `gotenberg` | `gotenberg/gotenberg:8` (pinned by digest) | Office → PDF only | **none (orchestrator-enforced)** | none |
+| `redis` | upstream | Job queue + page cache | internal | – |
 
-The office container is only invoked when a job's detected mime is an office format. It stays running but idle otherwise.
+Gotenberg is only invoked when a job's detected mime is an office format. It stays running but idle otherwise. The worker calls `POST {GOTENBERG_URL}/forms/libreoffice/convert` with the source file as multipart form data and reads the PDF response body.
+
+**Gotenberg hardening (orchestrator-enforced):**
+- **Compose:** `read_only: true`, `tmpfs: [/tmp]`, `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, on an internal-only Docker network with no internet route. CPU + memory limits.
+- **K8s:** `securityContext` with `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`. A `NetworkPolicy` allows ingress only from `viewer-worker` pods and **denies all egress** (no internet, no cluster-internal lateral movement). Resource requests/limits set.
+- Pinned by image digest, not `:8` tag, so updates are intentional.
 
 ## 4. API surface
 
@@ -117,8 +123,8 @@ Error bodies are intentionally sparse: `{"error": "...", "request_id": "..."}`. 
 | Source mime | Pipeline |
 |---|---|
 | `application/pdf` | PyMuPDF opens stream → render page N to RGB at DPI = `clamp(w / page_pt_width * 72, 72, 300)` → Pillow watermark → encode WebP (q=82, method=4) → cache |
-| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Write to office tmpfs → office container runs `libreoffice --headless --safe-mode --convert-to pdf` → returned PDF goes through PDF pipeline. Intermediate PDF cached per-JWT for the manifest TTL. |
-| `.pptx`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf` | Same as docx |
+| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Worker POSTs source as multipart to `{GOTENBERG_URL}/forms/libreoffice/convert` with a per-request timeout → receives PDF response → PDF goes through the PDF pipeline above. Intermediate PDF cached per-JWT for the manifest TTL. |
+| `.pptx`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf` | Same as docx — all handled by Gotenberg's LibreOffice route |
 | `image/png`, `image/jpeg`, `image/webp` | Pillow opens → strip all EXIF/metadata → re-encode WebP → watermark → cache. Single page. |
 | `image/heic` | Same, via `pillow-heif` plugin |
 | `image/tiff` | Multi-page: each page → re-encode WebP → watermark → cache |
@@ -156,7 +162,9 @@ Stateless JWT issued by the upstream back-office app, verified by `viewer-api`.
 
 **Replay protection:** `viewer-api` records `jti` in Redis via `SETNX` with TTL = `exp - iat`. Reuse → 401.
 
-**Token in URL:** Acceptable here because tokens are short-lived (5–15 min recommended), single-use, and scoped to a single object + user. URL ends up in nginx logs — operators should either drop the path in log format or rotate logs aggressively.
+**Token in URL:** Acceptable here because tokens are short-lived (5–15 min recommended), single-use, and scoped to a single object + user. URL ends up in ingress logs — operators should either drop the path in log format or rotate logs aggressively.
+
+**Ingress pre-validation (optional):** Operators may put an ingress-level JWT validator (oauth2-proxy, Traefik plugin, k8s ingress filter, nginx `auth_jwt` module) in front of `viewer-api` to drop bad tokens at the edge. `viewer-api` always validates again — defense in depth, and the API still needs the claims to know what to render. The viewer never trusts upstream-injected user headers in place of the JWT.
 
 **Watermark inputs** are taken from claims: `sub`, `case`, and the rendering server's current ISO timestamp.
 
@@ -198,29 +206,22 @@ Per-user keying because the watermark is baked into the image — different wate
 
 ## 10. Isolation specifics
 
-**`viewer-office` container hardening** (the highest-risk surface):
-- `--network none`
-- `--read-only` rootfs
-- `--tmpfs /tmp:rw,noexec,nosuid,size=200m`
-- `--cap-drop ALL`
-- `--security-opt no-new-privileges`
-- Non-root user (uid 1000)
-- `--memory 1g --memory-swap 1g`
-- `--cpus 1.5`
-- Restart policy: `on-failure`
-- Liveness: respawn container after `OFFICE_JOBS_PER_INSTANCE` jobs (default 100) — drops any accumulated state from malicious files.
+**`gotenberg` container hardening** (the highest-risk surface — runs LibreOffice on untrusted office files):
+- **Compose:** `read_only: true`; `tmpfs: { /tmp: rw,noexec,nosuid,size=512m }`; `cap_drop: [ALL]`; `security_opt: [no-new-privileges:true]`; attached to an internal-only Docker network with no internet route; memory limit 1.5g; cpus 1.5; `restart: unless-stopped`.
+- **K8s:** `securityContext: { runAsNonRoot: true, runAsUser: 1001, readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }`; `emptyDir` (memory-medium) at `/tmp`; `NetworkPolicy` denying all egress and allowing ingress only from `viewer-worker` pods; resource requests + limits; pinned image digest.
+- **Periodic restart:** k8s `CronJob` (or compose `restart` policy + periodic `docker compose restart gotenberg`) every 24h to flush any accumulated state. Gotenberg internally recycles LibreOffice processes per request, so per-job recycling is already handled.
 
-**`viewer-worker`** has S3 read-only credentials. Runs untrusted parsers (PyMuPDF, Pillow); subprocess isolation per job with timeout. Pillow opened with `MAX_IMAGE_PIXELS` set to prevent decompression bombs.
+**`viewer-worker`** has S3 read-only credentials. Runs untrusted parsers (PyMuPDF, Pillow); each render runs in a subprocess with a hard timeout. Pillow opened with `MAX_IMAGE_PIXELS` set to prevent decompression bombs. Has network access to Redis, S3/MinIO, and Gotenberg only — enforced by `NetworkPolicy` on k8s, by network membership on Compose.
 
-**`viewer-api`** runs no parsers; it only verifies JWTs and serves bytes from Redis.
+**`viewer-api`** runs no parsers; it only verifies JWTs and serves bytes from Redis. Network access to Redis only.
 
-**Inter-container file passing** (worker ↔ office): shared docker volume mounted as tmpfs in both. Worker writes input file with random name + restrictive perms; office reads it, writes output PDF; worker reads back. Files cleared after each job.
+**Inter-container communication** (worker ↔ gotenberg): HTTP multipart over an internal network. No shared filesystem. Worker streams the source file in the request body; Gotenberg returns the PDF in the response body. Both sides bounded by request timeout.
 
 ## 11. Error handling principles
 
 - **Fail closed.** Any rendering error returns an error response, never the original bytes.
 - **Worker crashes are not fatal to the system.** Job marked failed, container restarted, queue continues. Other in-flight jobs survive.
-- **Office worker recycled** after each crash and after N successful jobs.
+- **Gotenberg crashes** are handled by orchestrator restart policy; in-flight jobs in our worker fail cleanly with a 500 + request ID, and the next request reaches a fresh Gotenberg pod/container.
 - **No source-bytes-derived detail in errors** — error messages reference our mime allowlist and size caps, not the file's actual content.
 - **Request IDs** in every error response and log line for audit cross-reference.
 
@@ -256,7 +257,7 @@ Single `.env.example` documenting every variable. Categories:
 - **Source:** `SOURCE_BACKEND`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `FS_ROOT`
 - **Limits:** `MAX_SOURCE_BYTES`, `MAX_PAGES`, `MAX_PAGE_WIDTH`, `RENDER_TIMEOUT_SECONDS`, `OFFICE_TIMEOUT_SECONDS`
 - **Cache:** `REDIS_URL`, `CACHE_TTL_SECONDS`
-- **Worker:** `WORKER_CONCURRENCY`, `OFFICE_JOBS_PER_INSTANCE`
+- **Worker:** `WORKER_CONCURRENCY`, `GOTENBERG_URL`
 - **Watermark:** `WATERMARK_OPACITY`, `WATERMARK_FONT_SIZE`, `WATERMARK_ANGLE`, `WATERMARK_COLOR`
 - **Mime allowlist:** `ALLOWED_MIMES` (comma-separated)
 
@@ -274,11 +275,11 @@ Implementation must follow **red-green-refactor**: failing test first, minimum c
 - Watermark rendering (positions, opacity bounds)
 - Size cap enforcement (each cap triggers its own clean error)
 
-**Integration tests** (docker-compose-test profile):
-- Spin up MinIO + Redis + all three viewer containers
-- Upload fixture files to MinIO
+**Integration tests** (compose-test profile):
+- Spin up MinIO + Redis + Gotenberg + `viewer-api` + `viewer-worker`
+- Upload fixture files (PDFs, DOCX, XLSX, PNG, TIFF, malformed corpus) to MinIO
 - Issue JWTs with a test signing key
-- Assert: manifest matches expected, page renders to a non-empty WebP, second request hits cache, expired JWT 401s, replay 401s
+- Assert: manifest matches expected, page renders to a non-empty WebP, second request hits cache, expired JWT 401s, replay 401s, office formats round-trip through Gotenberg, Gotenberg's `:3000` is unreachable from outside the worker
 
 **Security regression corpus** (committed to repo, ~30 files):
 - Malformed PDFs (truncated, oversized streams, embedded JS, embedded files)
@@ -308,13 +309,24 @@ These are decisions the implementation plan needs to make, but they don't affect
 ## 16. Deliverables
 
 - `document-viewer/` directory containing:
-  - `services/api/` — FastAPI app
-  - `services/worker/` — render pipelines
-  - `services/office/` — LibreOffice container
-  - `services/embed/` — static HTML+JS shell (served by api)
-  - `docker-compose.yml` (prod) and `docker-compose.test.yml` (integration)
-  - `Dockerfile` per service
+  - `services/api/` — FastAPI app (also serves the embed shell as a static asset)
+  - `services/worker/` — render pipelines + Gotenberg client
+  - `services/embed/` — static HTML+JS shell, bundled into the api image
+  - `Dockerfile` per service (api, worker) — Gotenberg is pulled from upstream by digest
+  - **Local dev / single-host:**
+    - `compose.yaml` (Compose v2, podman-compose compatible) — prod-shaped deployment
+    - `compose.test.yaml` — integration test stack (MinIO + Redis + Gotenberg + api + worker)
+  - **Kubernetes:**
+    - `helm/document-viewer/` chart with:
+      - `Chart.yaml`, `values.yaml`, `values.example.yaml`
+      - `Deployment` per service (api, worker, gotenberg, redis if not external)
+      - `Service` + `Ingress` for api
+      - `NetworkPolicy` denying gotenberg egress, restricting worker→gotenberg ingress
+      - `SecurityContext` blocks per pod
+      - `ConfigMap` and `Secret` templates
+      - `HorizontalPodAutoscaler` for worker (optional, behind a values flag)
+      - `ServiceMonitor` (optional) for Prometheus scraping
   - `.env.example`
-  - `README.md` — quick start, integration guide, threat model summary
+  - `README.md` — quick start (both compose and helm), integration guide, threat model summary
   - `tests/` — unit, integration, security corpus
   - `docs/superpowers/specs/` — this design
