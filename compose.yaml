@@ -1,0 +1,56 @@
+name: document-viewer
+
+x-defaults: &svc
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt:
+    - "no-new-privileges:true"
+
+networks:
+  ingress:
+  internal:
+    internal: true
+
+services:
+  api:
+    <<: *svc
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    env_file: .env
+    networks: [ingress, internal]
+    ports: ["8000:8000"]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    <<: *svc
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    env_file: .env
+    networks: [internal]
+    depends_on:
+      redis: { condition: service_healthy }
+      gotenberg: { condition: service_started }
+
+  gotenberg:
+    <<: *svc
+    image: gotenberg/gotenberg:8@sha256:CHANGE-ME-TO-DIGEST
+    networks: [internal]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+    mem_limit: 1.5g
+    cpus: 1.5
+
+  redis:
+    <<: *svc
+    image: redis:7-alpine
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

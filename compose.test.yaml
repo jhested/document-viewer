@@ -1,0 +1,65 @@
+name: document-viewer-test
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio-user
+      MINIO_ROOT_PASSWORD: minio-password
+    ports: ["9000:9000", "9001:9001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports: ["3000:3000"]
+
+  api:
+    build: { context: ., dockerfile: services/api/Dockerfile }
+    environment:
+      JWT_ALGORITHM: HS256
+      JWT_HMAC_SECRET: test-secret-must-be-at-least-32-bytes-long!!
+      JWT_REQUIRED_ISS: back-office
+      REDIS_URL: redis://redis:6379/0
+      SOURCE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kyc-docs
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minio-user
+      S3_SECRET_ACCESS_KEY: minio-password
+      GOTENBERG_URL: http://gotenberg:3000
+    ports: ["8000:8000"]
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      gotenberg: { condition: service_started }
+
+  worker:
+    build: { context: ., dockerfile: services/worker/Dockerfile }
+    environment:
+      JWT_ALGORITHM: HS256
+      JWT_HMAC_SECRET: test-secret-must-be-at-least-32-bytes-long!!
+      REDIS_URL: redis://redis:6379/0
+      SOURCE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kyc-docs
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minio-user
+      S3_SECRET_ACCESS_KEY: minio-password
+      GOTENBERG_URL: http://gotenberg:3000
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      gotenberg: { condition: service_started }
