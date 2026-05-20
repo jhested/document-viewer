@@ -27,7 +27,7 @@ def get_jwt_verifier() -> JwtVerifier:
     )
 
 
-async def get_redis() -> redis_async.Redis[bytes]:
+async def get_redis() -> redis_async.Redis:  # type: ignore[type-arg]
     s = get_settings()
     return redis_async.from_url(s.redis_url, decode_responses=False)
 

@@ -16,8 +16,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    from document_viewer.api.routes import health
+
     app = FastAPI(title="document-viewer", lifespan=_lifespan)
-    # Routes and middleware land in T23-T27 and register themselves here.
+    app.include_router(health.router)
     return app
 
 
