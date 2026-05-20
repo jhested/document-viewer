@@ -1,0 +1,75 @@
+# Example values for `helm install document-viewer ./helm/document-viewer`.
+# Copy and edit only the fields that diverge from the chart defaults.
+
+image:
+  registry: ghcr.io
+  # Replace OWNER with the GitHub org/user that publishes the images.
+  repository: OWNER/document-viewer
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
+  service: { type: ClusterIP, port: 8000 }
+  ingress:
+    enabled: true
+    className: nginx
+    # Hostname the back-office or KYC console embeds via /embed/{jwt}.
+    host: viewer.example.com
+    tls: true
+
+worker:
+  # Workers do the rendering. Scale based on render volume, not RPS.
+  replicas: 3
+  concurrency: 4
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+gotenberg:
+  # Pin to a digest in prod; the placeholder must be replaced before release.
+  image: gotenberg/gotenberg:8@sha256:CHANGE-ME
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+
+redis:
+  # `embedded: true` runs a single in-chart Redis. Set false and point
+  # config/secrets at an external Redis for production.
+  embedded: true
+  image: redis:7-alpine
+
+config:
+  # RS256 in production (asymmetric); HS256 only for dev/tests.
+  jwtAlgorithm: RS256
+  jwtRequiredIss: back-office
+  sourceBackend: s3
+  s3Endpoint: "https://s3.example.com"
+  s3Bucket: "kyc-docs"
+  s3Region: us-east-1
+  cacheTtlSeconds: 900
+  maxSourceBytes: 104857600
+  maxPages: 500
+  maxPageWidth: 2400
+
+secrets:
+  # Provide via --set-file or a sealed-secrets / external-secrets pipeline.
+  jwtPublicKey: ""
+  s3AccessKeyId: ""
+  s3SecretAccessKey: ""
+
+monitoring:
+  serviceMonitor:
+    # Requires the Prometheus Operator in the cluster.
+    enabled: false
+    namespace: monitoring
+    interval: 30s

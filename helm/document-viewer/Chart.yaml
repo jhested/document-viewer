@@ -1,0 +1,10 @@
+apiVersion: v2
+name: document-viewer
+description: Safe document renderer for KYC/AML
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/OWNER/document-viewer
+sources: [https://github.com/OWNER/document-viewer]
+maintainers:
+  - name: Jimmi Hested

@@ -1,0 +1,63 @@
+image:
+  registry: ghcr.io
+  repository: OWNER/document-viewer
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 1000m, memory: 1Gi }
+  service: { type: ClusterIP, port: 8000 }
+  ingress:
+    enabled: true
+    className: nginx
+    host: viewer.example.com
+    tls: true
+
+worker:
+  replicas: 3
+  concurrency: 4
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+gotenberg:
+  image: gotenberg/gotenberg:8@sha256:CHANGE-ME
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: 2000m, memory: 2Gi }
+
+redis:
+  embedded: true
+  image: redis:7-alpine
+
+config:
+  jwtAlgorithm: RS256
+  jwtRequiredIss: back-office
+  sourceBackend: s3
+  s3Endpoint: ""
+  s3Bucket: ""
+  s3Region: us-east-1
+  cacheTtlSeconds: 900
+  maxSourceBytes: 104857600
+  maxPages: 500
+  maxPageWidth: 2400
+
+secrets:
+  jwtPublicKey: ""
+  s3AccessKeyId: ""
+  s3SecretAccessKey: ""
+
+monitoring:
+  serviceMonitor:
+    enabled: false
+    namespace: monitoring
+    interval: 30s
