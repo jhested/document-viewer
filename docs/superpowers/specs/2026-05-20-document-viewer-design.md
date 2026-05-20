@@ -35,7 +35,7 @@ The service is a **renderer, not a viewer app.** It exposes an image API; caller
                           │          │
                        Redis     ┌───┴──────────────────────┐
                   (queue+cache)  │  viewer-worker (Python)  │ ── pulls source from S3
-                                 │  - mime detect           │ ── PDF→images (PyMuPDF)
+                                 │  - mime detect           │ ── PDF→images (pypdfium2)
                                  │  - PDF/image pipeline    │ ── image re-encode (Pillow)
                                  │  - cache writes          │ ── watermarks
                                  └────────┬─────────────────┘
@@ -122,8 +122,8 @@ Error bodies are intentionally sparse: `{"error": "...", "request_id": "..."}`. 
 
 | Source mime | Pipeline |
 |---|---|
-| `application/pdf` | **pikepdf pre-clean** (strip `/JavaScript`, `/JS`, `/EmbeddedFile`, `/EmbeddedFiles`, `/AA`, `/OpenAction`, `/Launch`, `/GoToR`, `/ImportData`, `/SubmitForm`; drop attachments; remove encryption) → PyMuPDF opens the cleaned PDF → render page N to RGB at DPI = `clamp(w / page_pt_width * 72, 72, 300)` → Pillow watermark → encode WebP (q=82, method=4) → cache. Cleaned PDF cached separately so subsequent page requests skip the clean step. |
-| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Worker POSTs source as multipart to `{GOTENBERG_URL}/forms/libreoffice/convert` with a per-request timeout → receives PDF response → PDF runs through the PDF pipeline above (pikepdf clean → PyMuPDF render). Cleaned intermediate PDF cached per-JWT for the manifest TTL. |
+| `application/pdf` | **pikepdf pre-clean** (strip `/JavaScript`, `/JS`, `/EmbeddedFile`, `/EmbeddedFiles`, `/AA`, `/OpenAction`, `/Launch`, `/GoToR`, `/ImportData`, `/SubmitForm`; drop attachments; remove encryption) → pypdfium2 opens the cleaned PDF → render page N to RGB at DPI = `clamp(w / page_pt_width * 72, 72, 300)` → Pillow watermark → encode WebP (q=82, method=4) → cache. Cleaned PDF cached separately so subsequent page requests skip the clean step. |
+| `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx) | Worker POSTs source as multipart to `{GOTENBERG_URL}/forms/libreoffice/convert` with a per-request timeout → receives PDF response → PDF runs through the PDF pipeline above (pikepdf clean → pypdfium2 render). Cleaned intermediate PDF cached per-JWT for the manifest TTL. |
 | `.pptx`, `.xlsx`, `.odt`, `.ods`, `.odp`, `.rtf` | Same as docx — all handled by Gotenberg's LibreOffice route |
 | `image/png`, `image/jpeg`, `image/webp` | Pillow opens → strip all EXIF/metadata → re-encode WebP → watermark → cache. Single page. |
 | `image/heic` | Same, via `pillow-heif` plugin |
@@ -211,7 +211,7 @@ Per-user keying because the watermark is baked into the image — different wate
 - **K8s:** `securityContext: { runAsNonRoot: true, runAsUser: 1001, readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }`; `emptyDir` (memory-medium) at `/tmp`; `NetworkPolicy` denying all egress and allowing ingress only from `viewer-worker` pods; resource requests + limits; pinned image digest.
 - **Periodic restart:** k8s `CronJob` (or compose `restart` policy + periodic `docker compose restart gotenberg`) every 24h to flush any accumulated state. Gotenberg internally recycles LibreOffice processes per request, so per-job recycling is already handled.
 
-**`viewer-worker`** has S3 read-only credentials. Runs untrusted parsers (PyMuPDF, Pillow); each render runs in a subprocess with a hard timeout. Pillow opened with `MAX_IMAGE_PIXELS` set to prevent decompression bombs. Has network access to Redis, S3/MinIO, and Gotenberg only — enforced by `NetworkPolicy` on k8s, by network membership on Compose.
+**`viewer-worker`** has S3 read-only credentials. Runs untrusted parsers (pypdfium2, Pillow); each render runs in a subprocess with a hard timeout. Pillow opened with `MAX_IMAGE_PIXELS` set to prevent decompression bombs. Has network access to Redis, S3/MinIO, and Gotenberg only — enforced by `NetworkPolicy` on k8s, by network membership on Compose.
 
 **`viewer-api`** runs no parsers; it only verifies JWTs and serves bytes from Redis. Network access to Redis only.
 
@@ -283,7 +283,7 @@ Implementation must follow **red-green-refactor**: failing test first, minimum c
 
 **Security regression corpus** (committed to repo, ~30 files):
 - Malformed PDFs (truncated, oversized streams, embedded JS, embedded files)
-- PDFs with `/JavaScript`, `/EmbeddedFile`, `/OpenAction`, `/Launch` — assert pikepdf removes them before PyMuPDF sees the file (snapshot the cleaned PDF's object tree)
+- PDFs with `/JavaScript`, `/EmbeddedFile`, `/OpenAction`, `/Launch` — assert pikepdf removes them before pypdfium2 sees the file (snapshot the cleaned PDF's object tree)
 - DOCX with macros, OLE objects, external image refs
 - Zip bombs (DOCX is a zip; test the dezipper limits)
 - Image decompression bombs (pixel-flood, malformed headers)
@@ -307,27 +307,107 @@ These are decisions the implementation plan needs to make, but they don't affect
 - Exact font shipped for watermarking (Inter / DejaVu Sans)
 - Whether the embed shell should support pinch-to-zoom on mobile in v1
 
-## 16. Deliverables
+## 16. Open-source posture
 
-- `document-viewer/` directory containing:
-  - `services/api/` — FastAPI app (also serves the embed shell as a static asset)
-  - `services/worker/` — render pipelines + Gotenberg client
-  - `services/embed/` — static HTML+JS shell, bundled into the api image
-  - `Dockerfile` per service (api, worker) — Gotenberg is pulled from upstream by digest
-  - **Local dev / single-host:**
-    - `compose.yaml` (Compose v2, podman-compose compatible) — prod-shaped deployment
-    - `compose.test.yaml` — integration test stack (MinIO + Redis + Gotenberg + api + worker)
-  - **Kubernetes:**
-    - `helm/document-viewer/` chart with:
-      - `Chart.yaml`, `values.yaml`, `values.example.yaml`
-      - `Deployment` per service (api, worker, gotenberg, redis if not external)
-      - `Service` + `Ingress` for api
-      - `NetworkPolicy` denying gotenberg egress, restricting worker→gotenberg ingress
-      - `SecurityContext` blocks per pod
-      - `ConfigMap` and `Secret` templates
-      - `HorizontalPodAutoscaler` for worker (optional, behind a values flag)
-      - `ServiceMonitor` (optional) for Prometheus scraping
-  - `.env.example`
-  - `README.md` — quick start (both compose and helm), integration guide, threat model summary
-  - `tests/` — unit, integration, security corpus
-  - `docs/superpowers/specs/` — this design
+The project will ship under **MIT** on a public repo.
+
+**License compatibility of dependencies** (all MIT-friendly):
+
+| Dependency | License | Notes |
+|---|---|---|
+| FastAPI | MIT | – |
+| Pillow | HPND (BSD-like) | – |
+| `pikepdf` | MPL-2.0 | File-level copyleft; does not contaminate MIT |
+| `pypdfium2` | Apache-2.0 / BSD-3-Clause | PDF rendering — replaces PyMuPDF, which is AGPL and would have contaminated the MIT licence |
+| `python-magic` | MIT | – |
+| `aioboto3` | Apache-2.0 | – |
+| `redis-py` | MIT | – |
+| `arq` (or `dramatiq`) | MIT | – |
+| `pyjwt` | MIT | – |
+| Gotenberg image | MIT | Pulled from upstream by digest; not bundled |
+| LibreOffice (inside Gotenberg) | MPL-2.0 | Separate process, not linked into our code |
+
+**SBOM** generated via `syft` in CI, attached to each release.
+**License scan** via `pip-licenses` in CI; PR fails if a new dep is non-MIT-compatible.
+
+## 17. Repository layout & docs
+
+```
+document-viewer/
+├── LICENSE                          ← MIT
+├── README.md                        ← landing: what it is, quickstart, links
+├── SECURITY.md                      ← vulnerability reporting policy + contact
+├── CONTRIBUTING.md                  ← dev setup, PR process, testing
+├── CODE_OF_CONDUCT.md               ← Contributor Covenant v2.1
+├── CHANGELOG.md                     ← keep-a-changelog format
+├── .github/
+│   ├── ISSUE_TEMPLATE/{bug_report,feature_request,security}.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/
+│       ├── ci.yml                   ← lint, unit, integration, security corpus
+│       ├── release.yml              ← container image build + push to GHCR
+│       ├── codeql.yml               ← static analysis
+│       └── sbom.yml                 ← syft SBOM on release
+├── services/
+│   ├── api/                         ← FastAPI app (serves embed shell)
+│   ├── worker/                      ← render pipelines + Gotenberg client
+│   └── embed/                       ← static HTML+JS, bundled into api image
+├── compose.yaml                     ← Compose v2, podman-compose compatible
+├── compose.test.yaml                ← integration test stack
+├── helm/document-viewer/            ← Helm chart for k8s (see §3 / §10)
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── security-corpus/             ← malicious test fixtures + expected outcomes
+├── .env.example
+└── docs/
+    ├── index.md
+    ├── getting-started/
+    │   ├── quickstart.md            ← 5-min compose-up demo with embed shell
+    │   ├── installation-compose.md
+    │   └── installation-helm.md
+    ├── architecture/
+    │   ├── overview.md              ← distilled from the design spec
+    │   ├── data-flow.md             ← per-request diagram, cache, queue
+    │   └── component-reference.md
+    ├── api/
+    │   ├── reference.md             ← every endpoint, params, responses, errors
+    │   └── jwt.md                   ← claim format, signing examples
+    ├── integration/
+    │   ├── issuing-tokens.md        ← back-office JWT signing recipes
+    │   ├── embedding.md             ← <img> usage + embed shell iframe
+    │   └── examples/                ← Python / Node / Go snippets
+    ├── operations/
+    │   ├── configuration.md         ← every env var documented
+    │   ├── deployment-compose.md
+    │   ├── deployment-helm.md
+    │   ├── monitoring.md            ← what to log, what to alert on
+    │   ├── tuning.md                ← worker concurrency, DPI caps, cache size
+    │   └── upgrades.md              ← compatibility matrix, breaking changes
+    ├── security/
+    │   ├── threat-model.md          ← STRIDE-ish: what we defend, what we don't
+    │   ├── hardening.md             ← prod checklist (NetworkPolicy, secrets, etc.)
+    │   ├── disclosure.md            ← coordinated disclosure timeline
+    │   └── known-limitations.md     ← honest list of trade-offs (no screenshot prevention, etc.)
+    ├── development/
+    │   ├── setup.md                 ← local dev workflow
+    │   ├── testing.md               ← TDD approach, fixtures, security corpus
+    │   ├── adr/                     ← Architecture Decision Records (MADR format)
+    │   │   ├── README.md            ← ADR index + template
+    │   │   ├── 0001-render-to-images-not-stream-pdf.md
+    │   │   ├── 0002-gotenberg-vs-bespoke-libreoffice.md
+    │   │   ├── 0003-pypdfium2-vs-pymupdf-licensing.md
+    │   │   └── 0004-jwt-from-upstream-vs-internal-oidc.md
+    │   └── release-process.md
+    └── design/
+        └── 2026-05-20-document-viewer-design.md   ← this spec (moved from docs/superpowers/specs/)
+```
+
+**Notes on the layout:**
+
+- **ADRs** capture *why* significant decisions were made. The four we have material for from this brainstorm are listed above and should be written from this spec as part of the initial commit.
+- **`security/known-limitations.md`** is non-negotiable: honest about what the project doesn't do (no DoS protection beyond rate limits, no anti-screenshot, no protection against authorized employees with screen-record tools, etc.). Sets expectations and avoids users assuming guarantees we don't make.
+- **`docs/design/`** (not `docs/superpowers/specs/`) — `superpowers` is internal tooling and would be confusing externally. The spec gets moved on first public commit.
+- **`docs/` is plain markdown** for v1; can layer **MkDocs Material** or **Docusaurus** later without restructuring. Each markdown file should also stand on its own when read on GitHub.
+- **CI on every PR**: lint (ruff + mypy), unit tests, integration tests, full security corpus, CodeQL. Required green before merge.
+- **Releases** trigger `release.yml` to build `ghcr.io/<owner>/document-viewer-api` and `…-worker` images, sign them with cosign, and attach the syft SBOM.
