@@ -19,9 +19,19 @@ import httpx
 import jwt as pyjwt
 import pytest
 
-# Auto-tag every collected test in this package with the `integration` marker
-# so pyproject's `addopts = "-m 'not integration'"` skips them by default.
-pytestmark = pytest.mark.integration
+
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
+    """Auto-tag every test in this package with the `integration` marker.
+
+    pyproject's `addopts = "-m 'not integration'"` then skips them by default;
+    enable with `pytest -m integration tests/integration`.
+    """
+    for item in items:
+        if "tests/integration" in str(item.path):
+            item.add_marker(pytest.mark.integration)
 
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
