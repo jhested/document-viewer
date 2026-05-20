@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>document-viewer</title>
+  <style>
+    html, body { margin: 0; background: #1f1f23; color: #e7e7ea; font-family: system-ui, sans-serif; }
+    header { padding: 8px 12px; background: #2a2a30; display: flex; gap: 12px; align-items: center; }
+    #pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; }
+    .page { max-width: 100%; box-shadow: 0 2px 12px rgba(0,0,0,.4); background: white; }
+    button { background: #3a3a44; color: inherit; border: 0; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+    #status { margin-left: auto; opacity: .7; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="zoom-out">-</button>
+    <button id="zoom-in">+</button>
+    <span id="status">loading...</span>
+  </header>
+  <div id="pages"></div>
+  <script src="/embed/main.js" data-token="__JWT__"></script>
+</body>
+</html>
