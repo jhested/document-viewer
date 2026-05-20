@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: {{ .Release.Name }}-config }
+data:
+  JWT_ALGORITHM: {{ .Values.config.jwtAlgorithm | quote }}
+  JWT_REQUIRED_ISS: {{ .Values.config.jwtRequiredIss | quote }}
+  SOURCE_BACKEND: {{ .Values.config.sourceBackend | quote }}
+  S3_ENDPOINT: {{ .Values.config.s3Endpoint | quote }}
+  S3_BUCKET: {{ .Values.config.s3Bucket | quote }}
+  S3_REGION: {{ .Values.config.s3Region | quote }}
+  CACHE_TTL_SECONDS: {{ .Values.config.cacheTtlSeconds | quote }}
+  MAX_SOURCE_BYTES: {{ .Values.config.maxSourceBytes | quote }}
+  MAX_PAGES: {{ .Values.config.maxPages | quote }}
+  MAX_PAGE_WIDTH: {{ .Values.config.maxPageWidth | quote }}

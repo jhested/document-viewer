@@ -1,0 +1,12 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace }}
+spec:
+  endpoints: [{ port: http, interval: {{ .Values.monitoring.serviceMonitor.interval }}, path: /metrics }]
+  selector:
+    matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: api }
+  namespaceSelector: { any: true }
+{{- end }}
