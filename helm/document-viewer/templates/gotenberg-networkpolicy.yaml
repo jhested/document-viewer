@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-gotenberg
+  labels: { {{- include "viewer.labels" . | nindent 4 }} }
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: gotenberg }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: worker }
+      ports: [{ protocol: TCP, port: 3000 }]
+  # No egress rules => default-deny egress.
+  egress: []
