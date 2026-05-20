@@ -16,9 +16,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    from document_viewer.api.middleware import install_middleware
     from document_viewer.api.routes import embed, health, render
 
     app = FastAPI(title="document-viewer", lifespan=_lifespan)
+    install_middleware(app)
     app.include_router(health.router)
     app.include_router(render.router)
     app.include_router(embed.router)
