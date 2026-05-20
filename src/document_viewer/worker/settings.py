@@ -29,10 +29,7 @@ class WorkerSettings:
 # (so a worker started against a missing-jobs module fails fast with a clear
 # arq error rather than an opaque ImportError during module load).
 try:
-    from document_viewer.worker.jobs import (  # type: ignore[import-untyped]
-        render_manifest,
-        render_page,
-    )
+    from document_viewer.worker.jobs import render_manifest, render_page
 
     WorkerSettings.functions = [render_manifest, render_page]
 except ImportError:
