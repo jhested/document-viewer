@@ -3,7 +3,7 @@
 A complete end-to-end demo:
 
 - **React 19 + Vite + TypeScript** frontend — upload files, list them, click to preview.
-- **ASP.NET Core 9 (C#)** backend — issues presigned S3 PUT URLs and mints viewer JWTs.
+- **ASP.NET Core 10 (C#)** backend — issues presigned S3 PUT URLs and mints viewer JWTs.
 - **MinIO** S3-compatible storage.
 - **document-viewer** (this repo's `viewer-api` + `viewer-worker`) for rendering.
 
