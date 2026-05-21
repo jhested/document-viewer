@@ -11,17 +11,18 @@ from document_viewer.render.pdf_render import PdfDocument, render_page
 from document_viewer.shared.errors import TooManyPages
 from document_viewer.shared.watermark import WatermarkConfig, apply_watermark
 
-OFFICE_MIMES = frozenset(
-    {
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "application/vnd.oasis.opendocument.text",
-        "application/vnd.oasis.opendocument.spreadsheet",
-        "application/vnd.oasis.opendocument.presentation",
-        "application/rtf",
-    }
-)
+# Gotenberg's LibreOffice route picks a converter from the upload filename's
+# extension, so the per-MIME extension must round-trip through the request.
+OFFICE_MIME_EXTENSIONS: dict[str, str] = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "application/vnd.oasis.opendocument.text": "odt",
+    "application/vnd.oasis.opendocument.spreadsheet": "ods",
+    "application/vnd.oasis.opendocument.presentation": "odp",
+    "application/rtf": "rtf",
+}
+OFFICE_MIMES = frozenset(OFFICE_MIME_EXTENSIONS)
 
 IMAGE_MIMES = frozenset(
     {"image/png", "image/jpeg", "image/webp", "image/heic", "image/tiff", "image/gif"}
@@ -58,7 +59,10 @@ class RenderPipeline:
         if job.mime == "application/pdf":
             raw = job.source_bytes
         elif job.mime in OFFICE_MIMES:
-            raw = await self._gotenberg.convert_to_pdf(filename="src", data=job.source_bytes)
+            raw = await self._gotenberg.convert_to_pdf(
+                filename=f"source.{OFFICE_MIME_EXTENSIONS[job.mime]}",
+                data=job.source_bytes,
+            )
         else:
             raise ValueError(f"unsupported mime for pdf pipeline: {job.mime}")
         # Reject by page count before the (expensive) sanitization pass.

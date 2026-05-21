@@ -43,6 +43,9 @@ class WorkerSettings:
     """Module-level config picked up by `arq document_viewer.worker.settings.WorkerSettings`."""
 
     functions: ClassVar[list[object]] = []  # populated below, after jobs loads
+    # arq's default is 0.5s; for an HTTP-blocking request path that dispatch
+    # latency dominates real work on small docs and masks cache speedups.
+    poll_delay: ClassVar[float] = 0.1
 
     @staticmethod
     async def on_startup(ctx: dict[str, Any]) -> None:

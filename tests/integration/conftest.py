@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import boto3
@@ -99,5 +99,6 @@ def make_token() -> Callable[..., str]:
 
 
 @pytest.fixture
-def client() -> httpx.Client:
-    return httpx.Client(base_url=API_BASE, timeout=60)
+def client() -> Iterator[httpx.Client]:
+    with httpx.Client(base_url=API_BASE, timeout=60) as c:
+        yield c

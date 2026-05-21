@@ -77,7 +77,9 @@ async def manifest(
     )
     if job is None:
         raise HTTPException(status_code=503, detail="job queue unavailable")
-    payload = await job.result(timeout=settings.render_timeout_seconds)
+    payload = await job.result(
+        timeout=settings.render_timeout_seconds, poll_delay=0.05
+    )
     response.headers["Cache-Control"] = "no-store"
     return {**payload, "ttl_seconds": settings.cache_ttl_seconds}
 
@@ -112,7 +114,9 @@ async def page(
     )
     if job is None:
         raise HTTPException(status_code=503, detail="job queue unavailable")
-    webp = await job.result(timeout=settings.render_timeout_seconds)
+    webp = await job.result(
+        timeout=settings.render_timeout_seconds, poll_delay=0.05
+    )
     return Response(
         content=webp,
         media_type="image/webp",
