@@ -72,6 +72,12 @@ upload box, click the entry to preview.
   the direct browser-to-MinIO PUT.
 - **`frontend/src/App.tsx`** — The whole UI: login, upload, list, embed.
 
+## Why this stack?
+
+See [`docs/adr/0001-sample-tech-stack.md`](docs/adr/0001-sample-tech-stack.md)
+for the per-axis decision: React 19 + Vite, TypeScript, ASP.NET Core 10,
+browser-direct presigned PUT, and the `<iframe>` embed pattern.
+
 ## Production notes (i.e. don't copy this as-is)
 
 - The HMAC secret in `compose.yaml` is the integration-test secret. Replace it
