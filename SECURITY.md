@@ -32,4 +32,4 @@ Out of scope: vulnerabilities in upstream dependencies (Gotenberg, LibreOffice, 
 
 ## Threat model
 
-See `docs/security/threat-model.md` for what this project does and does not defend against.
+See the [threat model](docs/security/threat-model.md) for what this project does and does not defend against.

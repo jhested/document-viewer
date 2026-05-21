@@ -23,7 +23,7 @@ pytest tests/unit -v
 
 # Integration tests (spins up MinIO + Redis + Gotenberg via compose.test.yaml)
 docker compose -f compose.test.yaml up -d
-pytest tests/integration -v
+pytest -m integration tests/integration -v
 docker compose -f compose.test.yaml down
 
 # Security regression corpus
@@ -41,7 +41,7 @@ pytest tests/security_corpus -v
 1. Fork and branch from `main`.
 2. Write failing tests first; commit them before the implementation.
 3. Keep PRs focused — one logical change.
-4. Update `CHANGELOG.md` under `## [Unreleased]`.
+4. Update [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]`.
 5. Ensure CI is green.
 
-See `docs/development/setup.md` for the full dev workflow.
+See the [development setup guide](docs/development/setup.md) for the full dev workflow.
