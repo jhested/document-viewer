@@ -1,0 +1,90 @@
+name: document-viewer-sample
+
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio-user
+      MINIO_ROOT_PASSWORD: minio-password
+    ports: ["9000:9000", "9001:9001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+
+  viewer-api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    environment:
+      JWT_ALGORITHM: HS256
+      JWT_HMAC_SECRET: test-secret-must-be-at-least-32-bytes-long!!
+      JWT_REQUIRED_ISS: back-office
+      REDIS_URL: redis://redis:6379/0
+      SOURCE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kyc-docs
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minio-user
+      S3_SECRET_ACCESS_KEY: minio-password
+      GOTENBERG_URL: http://gotenberg:3000
+    ports: ["8000:8000"]
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      gotenberg: { condition: service_started }
+
+  viewer-worker:
+    build:
+      context: ../..
+      dockerfile: services/worker/Dockerfile
+    environment:
+      JWT_ALGORITHM: HS256
+      JWT_HMAC_SECRET: test-secret-must-be-at-least-32-bytes-long!!
+      REDIS_URL: redis://redis:6379/0
+      SOURCE_BACKEND: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kyc-docs
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: minio-user
+      S3_SECRET_ACCESS_KEY: minio-password
+      GOTENBERG_URL: http://gotenberg:3000
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      gotenberg: { condition: service_started }
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      # Internal endpoint — backend uses this to ListObjects / EnsureBucket.
+      S3__Endpoint: http://minio:9000
+      # Public endpoint — used for presigned URLs the browser will hit. Must be
+      # reachable from the browser, so it's localhost from the host's POV.
+      S3__PublicEndpoint: http://localhost:9000
+      S3__AccessKey: minio-user
+      S3__SecretKey: minio-password
+      S3__Bucket: kyc-docs
+      S3__Region: us-east-1
+      Jwt__HmacSecret: test-secret-must-be-at-least-32-bytes-long!!
+      Jwt__Issuer: back-office
+      Jwt__TtlSeconds: "300"
+      ViewerBaseUrl: http://localhost:8000
+      FrontendOrigin: http://localhost:5173
+    ports: ["5099:5099"]
+    depends_on:
+      minio: { condition: service_healthy }
