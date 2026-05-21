@@ -30,15 +30,20 @@ ReplayDep = Annotated[JwtReplayGuard, Depends(get_replay_guard)]
 ArqDep = Annotated[ArqRedis, Depends(get_arq_pool)]
 
 
-async def _claims(
-    jwt: str, verifier: JwtVerifier, replay: JwtReplayGuard
-) -> JwtClaims:
+async def _verify(jwt: str, verifier: JwtVerifier) -> JwtClaims:
     try:
-        claims = verifier.verify(jwt)
+        return verifier.verify(jwt)
     except TokenExpired as e:
         raise HTTPException(status_code=401, detail="token expired") from e
     except TokenInvalid as e:
         raise HTTPException(status_code=401, detail="token invalid") from e
+
+
+async def _claims(
+    jwt: str, verifier: JwtVerifier, replay: JwtReplayGuard
+) -> JwtClaims:
+    """Verify and burn the token's jti (manifest path)."""
+    claims = await _verify(jwt, verifier)
     try:
         await replay.claim(claims)
     except TokenReplayed as e:
@@ -78,11 +83,14 @@ async def page(
     n: int,
     settings: SettingsDep,
     verifier: VerifierDep,
-    replay: ReplayDep,
     arq: ArqDep,
     w: int = 1200,
 ) -> Response:
-    claims = await _claims(jwt, verifier, replay)
+    # Page renders accept the JWT for its entire validity window so the
+    # /embed/{jwt} shell can fetch /manifest + N pages with one token. The
+    # one-time replay-claim happens on /manifest (the canonical access gate);
+    # individual page fetches only re-verify signature, issuer, and expiry.
+    claims = await _verify(jwt, verifier)
     width = min(max(1, w), settings.max_page_width)
     watermark = f"{claims.sub} - {claims.case}"
     job = await arq.enqueue_job(
