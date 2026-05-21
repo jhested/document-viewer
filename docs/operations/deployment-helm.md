@@ -28,7 +28,7 @@ $EDITOR my-values.yaml
 
 The fields you almost always need to change:
 
-- `image.repository` (replace `OWNER/document-viewer`)
+- `image.repository` (replace `jhested/document-viewer`)
 - `image.tag` (the app version you want to install)
 - `gotenberg.image` (replace `sha256:CHANGE-ME` with the real digest;
   obtain it with `docker buildx imagetools inspect gotenberg/gotenberg:8`)

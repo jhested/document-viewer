@@ -3,8 +3,8 @@
 
 image:
   registry: ghcr.io
-  # Replace OWNER with the GitHub org/user that publishes the images.
-  repository: OWNER/document-viewer
+  # The GitHub org/user that publishes the images.
+  repository: jhested/document-viewer
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 

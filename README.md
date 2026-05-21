@@ -2,7 +2,7 @@
 
 Safe, watermarking document renderer for KYC/AML and other PII-sensitive workflows. Converts PDF, office documents, and images into per-page WebP images via a stateless HTTP API — source bytes never reach the consumer browser.
 
-[![CI](https://github.com/OWNER/document-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/document-viewer/actions/workflows/ci.yml)
+[![CI](https://github.com/jhested/document-viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/jhested/document-viewer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## What it does
@@ -24,7 +24,7 @@ See `docs/security/known-limitations.md` for the complete honest list.
 ## Quickstart
 
 ```bash
-git clone https://github.com/OWNER/document-viewer.git
+git clone https://github.com/jhested/document-viewer.git
 cd document-viewer
 cp .env.example .env
 docker compose up -d

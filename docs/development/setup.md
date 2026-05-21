@@ -39,7 +39,7 @@ not on the loader path.
 ## Clone and create a virtualenv
 
 ```bash
-git clone https://github.com/OWNER/document-viewer.git
+git clone https://github.com/jhested/document-viewer.git
 cd document-viewer
 python3.12 -m venv .venv
 .venv/bin/pip install --upgrade pip

@@ -81,7 +81,7 @@ Treat unchecked items as blockers. Companion reading:
   cosign verify \
     --certificate-identity-regexp "https://github.com/.*/document-viewer" \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-    ghcr.io/OWNER/document-viewer-api@sha256:…
+    ghcr.io/jhested/document-viewer-api@sha256:…
   ```
 
   Wire this into your admission controller (Sigstore policy-controller,

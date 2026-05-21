@@ -7,7 +7,7 @@ Thanks for your interest. This project follows TDD — please write the failing 
 Requirements: Python 3.12+, Docker (or Podman) with Compose v2.
 
 ```bash
-git clone https://github.com/OWNER/document-viewer.git
+git clone https://github.com/jhested/document-viewer.git
 cd document-viewer
 python -m venv .venv
 source .venv/bin/activate

@@ -11,7 +11,7 @@ You will need:
 ## 1. Clone and start the stack
 
 ```bash
-git clone https://github.com/OWNER/document-viewer.git
+git clone https://github.com/jhested/document-viewer.git
 cd document-viewer
 cp .env.example .env
 docker compose -f compose.yaml -f compose.test.yaml up -d

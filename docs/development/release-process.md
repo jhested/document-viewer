@@ -104,14 +104,14 @@ breaking changes; document them prominently in the changelog.
 
    ```bash
    # Images and tags
-   docker buildx imagetools inspect ghcr.io/OWNER/document-viewer-api:0.2.0
-   docker buildx imagetools inspect ghcr.io/OWNER/document-viewer-worker:0.2.0
+   docker buildx imagetools inspect ghcr.io/jhested/document-viewer-api:0.2.0
+   docker buildx imagetools inspect ghcr.io/jhested/document-viewer-worker:0.2.0
 
    # Cosign signature on the digest
    cosign verify \
-     --certificate-identity-regexp "https://github.com/OWNER/document-viewer" \
+     --certificate-identity-regexp "https://github.com/jhested/document-viewer" \
      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-     ghcr.io/OWNER/document-viewer-api:0.2.0
+     ghcr.io/jhested/document-viewer-api:0.2.0
 
    # SBOM attached to the release
    gh release view v0.2.0 --json assets --jq '.assets[].name'

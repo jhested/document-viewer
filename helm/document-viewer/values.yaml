@@ -1,6 +1,6 @@
 image:
   registry: ghcr.io
-  repository: OWNER/document-viewer
+  repository: jhested/document-viewer
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
