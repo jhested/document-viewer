@@ -16,6 +16,7 @@ FIXTURE_PDF = Path(__file__).parent.parent / "fixtures" / "simple.pdf"
 @dataclass
 class _DummySettings:
     max_page_width: int = 2400
+    max_pages: int = 500
     watermark_opacity: float = 0.18
     watermark_font_size: int = 24
     watermark_angle: float = -30.0
@@ -48,6 +49,23 @@ async def test_pdf_pipeline_returns_manifest_and_page(watermark_cfg: WatermarkCo
 
     page = await pipeline.render_page(job, page=1, width=800)
     assert page.startswith(b"RIFF") and b"WEBP" in page[:16]
+
+
+@pytest.mark.asyncio
+async def test_pdf_pipeline_rejects_too_many_pages(watermark_cfg: WatermarkConfig) -> None:
+    pdf_bytes = FIXTURE_PDF.read_bytes()  # 3-page fixture
+    pipeline = RenderPipeline(
+        gotenberg=MagicMock(),
+        settings=_DummySettings(max_pages=2),
+        watermark=watermark_cfg,
+    )
+    job = RenderJob(
+        source_bytes=pdf_bytes, mime="application/pdf", watermark_text="alice"
+    )
+    from document_viewer.shared.errors import TooManyPages
+
+    with pytest.raises(TooManyPages):
+        await pipeline.manifest(job)
 
 
 @pytest.mark.asyncio

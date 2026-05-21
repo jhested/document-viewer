@@ -12,3 +12,12 @@ data:
   MAX_SOURCE_BYTES: {{ .Values.config.maxSourceBytes | quote }}
   MAX_PAGES: {{ .Values.config.maxPages | quote }}
   MAX_PAGE_WIDTH: {{ .Values.config.maxPageWidth | quote }}
+  RENDER_TIMEOUT_SECONDS: {{ .Values.config.renderTimeoutSeconds | quote }}
+  OFFICE_TIMEOUT_SECONDS: {{ .Values.config.officeTimeoutSeconds | quote }}
+  FS_ROOT: {{ .Values.config.fsRoot | quote }}
+  WATERMARK_OPACITY: {{ .Values.config.watermarkOpacity | quote }}
+  WATERMARK_FONT_SIZE: {{ .Values.config.watermarkFontSize | quote }}
+  WATERMARK_ANGLE: {{ .Values.config.watermarkAngle | quote }}
+  WATERMARK_COLOR: {{ .Values.config.watermarkColor | quote }}
+  RATE_LIMIT_PER_JTI: {{ .Values.config.rateLimitPerJti | quote }}
+  RATE_LIMIT_WINDOW_SECONDS: {{ .Values.config.rateLimitWindowSeconds | quote }}

@@ -46,13 +46,23 @@ config:
   s3Endpoint: ""
   s3Bucket: ""
   s3Region: us-east-1
+  fsRoot: /srv/docs
   cacheTtlSeconds: 900
   maxSourceBytes: 104857600
   maxPages: 500
   maxPageWidth: 2400
+  renderTimeoutSeconds: 30
+  officeTimeoutSeconds: 60
+  watermarkOpacity: "0.18"
+  watermarkFontSize: 24
+  watermarkAngle: "-30.0"
+  watermarkColor: "#808080"
+  rateLimitPerJti: 0
+  rateLimitWindowSeconds: 900
 
 secrets:
   jwtPublicKey: ""
+  jwtHmacSecret: ""
   s3AccessKeyId: ""
   s3SecretAccessKey: ""
 

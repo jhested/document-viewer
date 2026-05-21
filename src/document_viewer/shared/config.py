@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # Cache
     cache_ttl_seconds: int = 900
 
+    # Rate limit (per jti, soft cap; <= 0 disables — ingress is the primary control)
+    rate_limit_per_jti: int = 0
+    rate_limit_window_seconds: int = 900
+
     # Watermark
     watermark_opacity: float = 0.18
     watermark_font_size: int = 24

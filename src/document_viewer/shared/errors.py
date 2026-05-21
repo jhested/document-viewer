@@ -26,8 +26,18 @@ class UnsupportedMime(RenderError):
     pass
 
 
+class TooManyPages(RenderError):
+    pass
+
+
+class RateLimitExceeded(RenderError):
+    def __init__(self, *, retry_after: int) -> None:
+        super().__init__("rate limit exceeded")
+        self.retry_after = retry_after
+
+
 def error_to_http_status(e: RenderError) -> int:
-    if isinstance(e, ObjectTooLarge):
+    if isinstance(e, (ObjectTooLarge, TooManyPages)):
         return 413
     if isinstance(e, PageOutOfRange):
         return 404
@@ -35,4 +45,6 @@ def error_to_http_status(e: RenderError) -> int:
         return 415
     if isinstance(e, RenderTimeout):
         return 504
+    if isinstance(e, RateLimitExceeded):
+        return 429
     return 500

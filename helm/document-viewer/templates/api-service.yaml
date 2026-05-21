@@ -2,7 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-api
-  labels: { {{- include "viewer.labels" . | nindent 4 }} }
+  labels:
+    {{- include "viewer.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.api.service.type }}
   ports: [{ port: {{ .Values.api.service.port }}, targetPort: 8000, name: http }]

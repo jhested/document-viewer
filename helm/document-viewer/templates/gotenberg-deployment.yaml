@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-gotenberg
-  labels: { {{- include "viewer.labels" . | nindent 4 }} }
+  labels:
+    {{- include "viewer.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.gotenberg.replicas }}
   selector: { matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: gotenberg } }
