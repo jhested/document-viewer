@@ -19,7 +19,7 @@ Safe, watermarking document renderer for KYC/AML and other PII-sensitive workflo
 - Provide editing, annotation, OCR, or text extraction.
 - Prevent screenshots / screen recording (no software can).
 
-See `docs/security/known-limitations.md` for the complete honest list.
+See [known limitations](docs/security/known-limitations.md) for the complete honest list.
 
 ## Quickstart
 
@@ -31,7 +31,7 @@ docker compose up -d
 # open http://localhost:8000/embed/<jwt> to view a document
 ```
 
-See `docs/getting-started/quickstart.md` for the full 5-minute demo.
+See the [quickstart guide](docs/getting-started/quickstart.md) for the full 5-minute demo.
 
 ## Documentation
 
