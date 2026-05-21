@@ -43,23 +43,21 @@ AmazonS3Client BuildS3(string endpoint) =>
         }
     );
 
-var s3 = BuildS3(s3Internal); // reads (ListObjects, EnsureBucket)
-var s3Sign = BuildS3(s3Public); // presigning — host is part of the signed payload
+var s3 = BuildS3(s3Internal);
+// Sig-v4 covers the Host header, so presigning needs a client whose ServiceURL
+// is the host the *browser* will hit (different from the in-cluster name).
+var s3Sign = BuildS3(s3Public);
 
 var app = builder.Build();
 app.UseCors();
 
-// Make sure the bucket exists on startup. Idempotent.
 try
 {
     await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
     app.Logger.LogInformation("Created bucket {Bucket}", bucket);
 }
 catch (AmazonS3Exception e)
-    when (e.ErrorCode is "BucketAlreadyOwnedByYou" or "BucketAlreadyExists")
-{
-    // already there — fine
-}
+    when (e.ErrorCode is "BucketAlreadyOwnedByYou" or "BucketAlreadyExists") { }
 
 app.MapGet("/healthz", () => Results.Ok(new { ok = true }));
 
@@ -104,6 +102,8 @@ app.MapGet(
     {
         if (!IsValidUser(user))
             return Results.BadRequest(new { error = "invalid user" });
+        // Demo only — capped at the S3 default of 1000 keys. A real app would
+        // loop on ContinuationToken or paginate the UI.
         var resp = await s3.ListObjectsV2Async(
             new ListObjectsV2Request { BucketName = bucket, Prefix = $"users/{user}/" }
         );
@@ -143,7 +143,9 @@ app.MapPost(
             {
                 new Claim(JwtRegisteredClaimNames.Sub, req.User),
                 new Claim("obj", req.ObjectKey),
-                new Claim("case", string.IsNullOrWhiteSpace(req.Case) ? "default" : req.Case),
+                // Real apps wire `case` from a case-management system; this
+                // sample has no such concept, so it's a stable placeholder.
+                new Claim("case", "demo"),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
                 new Claim(
                     JwtRegisteredClaimNames.Iat,
@@ -170,4 +172,4 @@ static bool IsValidUser(string? user) =>
 
 record UploadRequest(string FileName, string ContentType, string User);
 
-record ViewerTokenRequest(string ObjectKey, string User, string? Case);
+record ViewerTokenRequest(string ObjectKey, string User);

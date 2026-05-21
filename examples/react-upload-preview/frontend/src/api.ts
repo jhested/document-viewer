@@ -1,5 +1,8 @@
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:5099";
 
+// Must match IsValidUser in backend/Program.cs.
+export const USER_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+
 export type Document = {
   key: string;
   name: string;
@@ -47,7 +50,7 @@ export const api = {
   mintViewerToken: (user: string, objectKey: string) =>
     request<ViewerTokenResponse>("/api/viewer-token", {
       method: "POST",
-      body: JSON.stringify({ objectKey, user, case: "default" }),
+      body: JSON.stringify({ objectKey, user }),
     }),
 
   uploadToS3: async (presign: PresignResponse, file: File) => {

@@ -87,3 +87,8 @@ upload box, click the entry to preview.
 - The presigned PUT URL expires in 10 minutes. Tune for your UX.
 - Viewer JWTs have a 5-minute TTL. The viewer's replay guard claims `jti` on
   `/manifest`; if your UI reloads the iframe, mint a fresh token.
+- The backend creates the bucket on startup. That's fine for a demo but turns
+  a transient MinIO blip into a crash loop — in production the bucket should
+  be provisioned out-of-band (Terraform, init job).
+- `/api/documents` returns at most 1000 keys (S3 default). Real apps need
+  pagination.
