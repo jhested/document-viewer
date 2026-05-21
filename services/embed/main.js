@@ -4,26 +4,40 @@
   const pagesEl = document.getElementById("pages");
   const status = document.getElementById("status");
   let width = 1200;
+  let pageCount = 0;
 
-  async function load() {
-    status.textContent = "loading...";
+  function renderPages() {
     pagesEl.replaceChildren();
-    const manifest = await fetch(`/render/${encodeURIComponent(token)}/manifest`).then(r => {
-      if (!r.ok) throw new Error(`manifest ${r.status}`);
-      return r.json();
-    });
-    for (let p = 1; p <= manifest.pages; p++) {
+    for (let p = 1; p <= pageCount; p++) {
       const img = document.createElement("img");
       img.className = "page";
       img.loading = "lazy";
       img.src = `/render/${encodeURIComponent(token)}/page/${p}?w=${width}`;
       pagesEl.appendChild(img);
     }
-    status.textContent = `${manifest.pages} pages`;
+    status.textContent = `${pageCount} pages, ${width}px`;
   }
 
-  document.getElementById("zoom-in").onclick = () => { width = Math.min(width + 200, 2400); load(); };
-  document.getElementById("zoom-out").onclick = () => { width = Math.max(width - 200, 400); load(); };
+  async function loadManifestThenPages() {
+    status.textContent = "loading...";
+    const manifest = await fetch(`/render/${encodeURIComponent(token)}/manifest`).then(r => {
+      if (!r.ok) throw new Error(`manifest ${r.status}`);
+      return r.json();
+    });
+    pageCount = manifest.pages;
+    renderPages();
+  }
 
-  load().catch(e => { status.textContent = `error: ${e.message}`; });
+  document.getElementById("zoom-in").onclick = () => {
+    if (!pageCount) return;
+    width = Math.min(width + 200, 2400);
+    renderPages();
+  };
+  document.getElementById("zoom-out").onclick = () => {
+    if (!pageCount) return;
+    width = Math.max(width - 200, 400);
+    renderPages();
+  };
+
+  loadManifestThenPages().catch(e => { status.textContent = `error: ${e.message}`; });
 })();
