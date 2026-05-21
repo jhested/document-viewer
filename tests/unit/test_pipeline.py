@@ -1,4 +1,5 @@
 """Unit tests for the pipeline dispatcher."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,9 +60,7 @@ async def test_pdf_pipeline_rejects_too_many_pages(watermark_cfg: WatermarkConfi
         settings=_DummySettings(max_pages=2),
         watermark=watermark_cfg,
     )
-    job = RenderJob(
-        source_bytes=pdf_bytes, mime="application/pdf", watermark_text="alice"
-    )
+    job = RenderJob(source_bytes=pdf_bytes, mime="application/pdf", watermark_text="alice")
     from document_viewer.shared.errors import TooManyPages
 
     with pytest.raises(TooManyPages):

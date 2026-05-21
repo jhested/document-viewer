@@ -1,4 +1,5 @@
 """Source backend abstraction. FilesystemBackend for tests; S3Backend (T10) for prod."""
+
 from __future__ import annotations
 
 import hashlib
@@ -83,7 +84,7 @@ class S3Backend:
                 if e.response["Error"]["Code"] in {"404", "NoSuchKey"}:
                     raise ObjectNotFound(key) from e
                 raise
-        return f"s3:{r['ETag'].strip('\"')}"
+        return f"s3:{r['ETag'].strip('"')}"
 
     async def fetch(self, key: str) -> tuple[AsyncIterator[bytes], str]:
         etag = await self.head(key)

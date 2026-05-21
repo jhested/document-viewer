@@ -1,4 +1,5 @@
 """Unit tests for the image pipeline (re-encode, EXIF strip, WebP encode)."""
+
 from __future__ import annotations
 
 import io

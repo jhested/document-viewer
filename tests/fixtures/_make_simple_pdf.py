@@ -1,4 +1,5 @@
 """Generate a 3-page Letter-sized PDF for renderer tests."""
+
 from pathlib import Path
 
 import pikepdf

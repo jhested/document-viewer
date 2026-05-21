@@ -1,4 +1,5 @@
 """Pipeline dispatcher: routes a source to PDF or image rendering, applies watermark."""
+
 from __future__ import annotations
 
 import asyncio

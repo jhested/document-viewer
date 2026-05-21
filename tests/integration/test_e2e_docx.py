@@ -1,4 +1,5 @@
 """End-to-end: docx -> Gotenberg -> pikepdf -> pypdfium2 -> WebP."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

@@ -1,4 +1,5 @@
 """End-to-end: PNG/JPEG source -> WebP page."""
+
 from __future__ import annotations
 
 import io

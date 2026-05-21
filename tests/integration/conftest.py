@@ -6,6 +6,7 @@ default `pytest` invocation. Run them with:
     docker compose -f compose.test.yaml up -d --wait
     pytest -m integration tests/integration
 """
+
 from __future__ import annotations
 
 import os
@@ -32,6 +33,7 @@ def pytest_collection_modifyitems(
     for item in items:
         if "tests/integration" in str(item.path):
             item.add_marker(pytest.mark.integration)
+
 
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")

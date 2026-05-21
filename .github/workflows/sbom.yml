@@ -7,14 +7,13 @@ on:
 jobs:
   sbom:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: document-viewer } }
     steps:
       - uses: actions/checkout@v4
       - uses: anchore/sbom-action@v0
         with:
           format: spdx-json
           output-file: sbom.spdx.json
-          path: document-viewer
+          path: .
       - uses: softprops/action-gh-release@v2
         with:
-          files: document-viewer/sbom.spdx.json
+          files: sbom.spdx.json

@@ -1,4 +1,5 @@
 """JWT verification — signature, expiry, issuer, claim presence."""
+
 from __future__ import annotations
 
 import time

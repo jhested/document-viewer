@@ -8,7 +8,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: document-viewer } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,7 +19,6 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: document-viewer } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,11 +27,10 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest tests/unit -v --cov --cov-report=xml
       - uses: codecov/codecov-action@v5
-        with: { files: document-viewer/coverage.xml }
+        with: { files: coverage.xml }
 
   integration:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: document-viewer } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,7 +38,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libmagic1
       - run: pip install -e ".[dev]"
       - run: docker compose -f compose.test.yaml up -d --wait
-      - run: pytest tests/integration -v
+      - run: pytest -m integration tests/integration -v
       - if: always()
         run: docker compose -f compose.test.yaml logs > /tmp/compose.log
       - if: always()
@@ -52,7 +49,6 @@ jobs:
 
   security-corpus:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: document-viewer } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

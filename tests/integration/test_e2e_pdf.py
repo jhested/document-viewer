@@ -1,4 +1,5 @@
 """End-to-end: PDF source -> manifest -> page render."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

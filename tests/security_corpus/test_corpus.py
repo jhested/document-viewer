@@ -1,4 +1,5 @@
 """Each corpus fixture must either render safely or return a documented error."""
+
 from __future__ import annotations
 
 import io

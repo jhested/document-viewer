@@ -1,4 +1,5 @@
 """Unit-test fixtures, including aiobotocore+moto compatibility patch."""
+
 from __future__ import annotations
 
 import inspect
@@ -20,9 +21,7 @@ import pytest
 # test via the autouse fixture below.
 
 
-async def _safe_convert_to_response_dict(
-    http_response: object, operation_model: object
-) -> dict:  # type: ignore[type-arg]
+async def _safe_convert_to_response_dict(http_response: object, operation_model: object) -> dict:  # type: ignore[type-arg]
     """Drop-in for ``aiobotocore.endpoint.convert_to_response_dict``.
 
     Handles both real aiohttp responses (coroutine .content) and moto's sync

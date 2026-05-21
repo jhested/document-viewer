@@ -1,4 +1,5 @@
 """Structured JSON logging on stdout for audit + observability."""
+
 from __future__ import annotations
 
 import logging

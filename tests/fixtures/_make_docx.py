@@ -2,6 +2,7 @@
 
 Run once after `pip install -e .[dev]`; commit the resulting simple.docx.
 """
+
 from pathlib import Path
 
 from docx import Document  # type: ignore[import-untyped]

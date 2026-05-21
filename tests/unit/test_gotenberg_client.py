@@ -1,4 +1,5 @@
 """Unit tests for the Gotenberg HTTP client."""
+
 from __future__ import annotations
 
 import pytest

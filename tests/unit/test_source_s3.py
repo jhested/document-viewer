@@ -1,4 +1,5 @@
 """Unit tests for the S3 source backend, using moto."""
+
 from __future__ import annotations
 
 import boto3

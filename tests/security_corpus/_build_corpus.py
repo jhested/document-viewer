@@ -1,4 +1,5 @@
 """Build the corpus. Run once; outputs are committed."""
+
 from __future__ import annotations
 
 import binascii

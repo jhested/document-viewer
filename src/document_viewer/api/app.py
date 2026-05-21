@@ -1,4 +1,5 @@
 """FastAPI application factory and `viewer-api` entrypoint."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator

@@ -1,4 +1,5 @@
 """Domain error taxonomy. Each maps to a stable HTTP status."""
+
 from __future__ import annotations
 
 

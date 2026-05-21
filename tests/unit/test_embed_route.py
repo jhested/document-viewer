@@ -1,4 +1,5 @@
 """Unit tests for the /embed route."""
+
 from __future__ import annotations
 
 from fastapi import FastAPI

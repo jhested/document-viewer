@@ -1,4 +1,5 @@
 """Magic-byte mime detection. Extension is never trusted."""
+
 from __future__ import annotations
 
 import magic

@@ -1,4 +1,5 @@
 """Unit tests for the pikepdf pre-rasterization cleaner."""
+
 from __future__ import annotations
 
 from pathlib import Path

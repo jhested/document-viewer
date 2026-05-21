@@ -1,4 +1,5 @@
 """Unit tests for the error taxonomy."""
+
 from __future__ import annotations
 
 from document_viewer.shared.errors import (

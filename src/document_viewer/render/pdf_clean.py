@@ -1,4 +1,5 @@
 """Defense-in-depth PDF sanitization before pypdfium2 sees the file."""
+
 from __future__ import annotations
 
 import io
@@ -6,7 +7,12 @@ import io
 import pikepdf
 
 _DANGEROUS_ROOT_KEYS = (
-    "/OpenAction", "/AA", "/AcroForm", "/Names", "/JavaScript", "/JS",
+    "/OpenAction",
+    "/AA",
+    "/AcroForm",
+    "/Names",
+    "/JavaScript",
+    "/JS",
 )
 
 

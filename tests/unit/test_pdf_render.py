@@ -1,4 +1,5 @@
 """Unit tests for pypdfium2 PDF rendering."""
+
 from __future__ import annotations
 
 from pathlib import Path

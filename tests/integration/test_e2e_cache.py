@@ -1,4 +1,5 @@
 """End-to-end: page renders are cached in Redis by etag/sub/page/width."""
+
 from __future__ import annotations
 
 import os
@@ -47,9 +48,7 @@ def test_second_page_request_is_cached(
     # The S3 backend uses "s3:<etag>" as its source etag; the cache key derives
     # from (etag, sub, page, width). After r1, the cached webp must be present.
     redis = redis_sync.Redis.from_url(REDIS_URL)
-    expected_key = page_key(
-        etag=f"s3:{_s3_etag(key)}", sub="alice", page=1, width=800
-    )
+    expected_key = page_key(etag=f"s3:{_s3_etag(key)}", sub="alice", page=1, width=800)
     cached = redis.get(expected_key)
     assert cached is not None, f"page cache miss for key {expected_key}"
     assert cached == r1.content

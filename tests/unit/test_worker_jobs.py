@@ -1,4 +1,5 @@
 """Unit tests for the worker job functions."""
+
 from __future__ import annotations
 
 from pathlib import Path

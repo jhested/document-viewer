@@ -1,4 +1,5 @@
 """/render routes: manifest and page."""
+
 from __future__ import annotations
 
 from typing import Annotated, Any
@@ -42,9 +43,7 @@ async def _verify(jwt: str, verifier: JwtVerifier) -> JwtClaims:
         raise HTTPException(status_code=401, detail="token invalid") from e
 
 
-async def _claims(
-    jwt: str, verifier: JwtVerifier, replay: JwtReplayGuard
-) -> JwtClaims:
+async def _claims(jwt: str, verifier: JwtVerifier, replay: JwtReplayGuard) -> JwtClaims:
     """Verify and burn the token's jti (manifest path)."""
     claims = await _verify(jwt, verifier)
     try:
@@ -77,9 +76,7 @@ async def manifest(
     )
     if job is None:
         raise HTTPException(status_code=503, detail="job queue unavailable")
-    payload = await job.result(
-        timeout=settings.render_timeout_seconds, poll_delay=0.05
-    )
+    payload = await job.result(timeout=settings.render_timeout_seconds, poll_delay=0.05)
     response.headers["Cache-Control"] = "no-store"
     return {**payload, "ttl_seconds": settings.cache_ttl_seconds}
 
@@ -114,9 +111,7 @@ async def page(
     )
     if job is None:
         raise HTTPException(status_code=503, detail="job queue unavailable")
-    webp = await job.result(
-        timeout=settings.render_timeout_seconds, poll_delay=0.05
-    )
+    webp = await job.result(timeout=settings.render_timeout_seconds, poll_delay=0.05)
     return Response(
         content=webp,
         media_type="image/webp",

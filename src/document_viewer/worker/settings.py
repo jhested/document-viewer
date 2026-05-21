@@ -1,4 +1,5 @@
 """arq WorkerSettings + the `viewer-worker` entrypoint."""
+
 from __future__ import annotations
 
 from typing import Any, ClassVar
@@ -28,13 +29,9 @@ def _build_source(s: Settings) -> SourceBackend:
         bucket=s.s3_bucket or "",
         region=s.s3_region,
         endpoint_url=s.s3_endpoint,
-        access_key_id=(
-            s.s3_access_key_id.get_secret_value() if s.s3_access_key_id else None
-        ),
+        access_key_id=(s.s3_access_key_id.get_secret_value() if s.s3_access_key_id else None),
         secret_access_key=(
-            s.s3_secret_access_key.get_secret_value()
-            if s.s3_secret_access_key
-            else None
+            s.s3_secret_access_key.get_secret_value() if s.s3_secret_access_key else None
         ),
     )
 

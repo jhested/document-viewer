@@ -1,4 +1,5 @@
 """Unit tests for the health routes."""
+
 from __future__ import annotations
 
 from fastapi import FastAPI

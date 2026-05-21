@@ -1,4 +1,5 @@
 """Server-side watermark rendering, baked into image pixels."""
+
 from __future__ import annotations
 
 import math

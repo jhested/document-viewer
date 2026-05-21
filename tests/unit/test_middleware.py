@@ -1,4 +1,5 @@
 """Unit tests for request-id middleware and error envelope."""
+
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException

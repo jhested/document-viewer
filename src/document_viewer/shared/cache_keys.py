@@ -1,4 +1,5 @@
 """Deterministic cache key derivation. Every sensitive input must be in the key."""
+
 from __future__ import annotations
 
 import hashlib

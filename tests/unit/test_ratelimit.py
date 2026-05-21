@@ -1,4 +1,5 @@
 """Per-jti rate limit unit tests."""
+
 from __future__ import annotations
 
 import fakeredis.aioredis

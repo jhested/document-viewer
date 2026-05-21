@@ -4,6 +4,7 @@ This is the application-side backstop. Ingress-level limits (per IP, per
 zero-trust identity) remain the primary control; see
 `docs/security/hardening.md`.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

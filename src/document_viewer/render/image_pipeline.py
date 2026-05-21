@@ -1,4 +1,5 @@
 """Image source pipeline: open -> strip metadata -> resize -> watermark -> WebP."""
+
 from __future__ import annotations
 
 import io

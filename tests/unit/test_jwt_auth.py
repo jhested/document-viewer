@@ -1,4 +1,5 @@
 """Unit tests for JWT verification."""
+
 from __future__ import annotations
 
 import time
@@ -85,7 +86,6 @@ def test_rejects_missing_required_claim() -> None:
         v.verify(no_obj)
 
 
-
 @pytest.mark.asyncio
 async def test_first_use_passes_then_replay_fails() -> None:
     redis = fakeredis.aioredis.FakeRedis()
@@ -103,8 +103,13 @@ async def test_replay_guard_ttl_matches_token_remaining_lifetime() -> None:
     redis = fakeredis.aioredis.FakeRedis()
     guard = JwtReplayGuard(redis)
     claims = JwtClaims(
-        iss="i", sub="s", obj="o", case="c", jti="uuid-2",
-        iat=int(time.time()), exp=int(time.time()) + 30,
+        iss="i",
+        sub="s",
+        obj="o",
+        case="c",
+        jti="uuid-2",
+        iat=int(time.time()),
+        exp=int(time.time()) + 30,
     )
     await guard.claim(claims)
     ttl = await redis.ttl(f"jti:{claims.jti}")

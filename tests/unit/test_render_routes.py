@@ -1,4 +1,5 @@
 """Unit tests for the /render routes."""
+
 from __future__ import annotations
 
 import time
@@ -92,9 +93,7 @@ def test_manifest_rejects_bad_jwt(client: TestClient) -> None:
 def test_page_returns_webp_and_no_store(client: TestClient) -> None:
     arq = client.app.dependency_overrides[get_arq_pool]()
     arq.enqueue_job = AsyncMock(
-        return_value=MagicMock(
-            result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 ")
-        )
+        return_value=MagicMock(result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 "))
     )
     r = client.get(f"/render/{_token()}/page/1?w=800")
     assert r.status_code == 200
@@ -128,9 +127,7 @@ def test_page_caps_width(client: TestClient) -> None:
 
     async def _enqueue(name: str, **kwargs: object) -> MagicMock:
         captured.update(kwargs)
-        return MagicMock(
-            result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 ")
-        )
+        return MagicMock(result=AsyncMock(return_value=b"RIFF\x00\x00\x00\x00WEBPVP8 "))
 
     arq.enqueue_job = AsyncMock(side_effect=_enqueue)
     client.get(f"/render/{_token()}/page/1?w=99999")

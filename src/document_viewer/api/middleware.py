@@ -1,4 +1,5 @@
 """HTTP middleware: request IDs, uniform error envelope."""
+
 from __future__ import annotations
 
 import uuid

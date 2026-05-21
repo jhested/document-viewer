@@ -1,4 +1,5 @@
 """End-to-end auth checks: expired, replayed, wrong issuer."""
+
 from __future__ import annotations
 
 import os

@@ -1,4 +1,5 @@
 """Unit tests for cache key derivation."""
+
 from __future__ import annotations
 
 from document_viewer.shared.cache_keys import cleaned_pdf_key, page_key

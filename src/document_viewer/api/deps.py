@@ -1,4 +1,5 @@
 """FastAPI dependency providers - Settings, Redis pool, JWT verifier, arq pool."""
+
 from __future__ import annotations
 
 from functools import lru_cache
