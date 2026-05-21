@@ -56,14 +56,29 @@ config:
   s3Endpoint: "https://s3.example.com"
   s3Bucket: "kyc-docs"
   s3Region: us-east-1
+  # Only used when sourceBackend=fs; bind-mount the path into the worker.
+  fsRoot: /srv/docs
   cacheTtlSeconds: 900
   maxSourceBytes: 104857600
   maxPages: 500
   maxPageWidth: 2400
+  renderTimeoutSeconds: 30
+  officeTimeoutSeconds: 60
+  watermarkOpacity: "0.18"
+  watermarkFontSize: 24
+  watermarkAngle: "-30.0"
+  watermarkColor: "#808080"
+  # Per-jti soft rate limit. 0 disables; ingress is the primary control.
+  # Set to e.g. 200 to bound a leaked-token replay storm to 200 requests
+  # within rateLimitWindowSeconds.
+  rateLimitPerJti: 0
+  rateLimitWindowSeconds: 900
 
 secrets:
   # Provide via --set-file or a sealed-secrets / external-secrets pipeline.
+  # Use jwtPublicKey for RS256; jwtHmacSecret for HS256. Only one applies.
   jwtPublicKey: ""
+  jwtHmacSecret: ""
   s3AccessKeyId: ""
   s3SecretAccessKey: ""
 

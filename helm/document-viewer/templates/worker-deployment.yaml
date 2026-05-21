@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-worker
-  labels: { {{- include "viewer.labels" . | nindent 4 }} }
+  labels:
+    {{- include "viewer.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.worker.replicas }}
   selector: { matchLabels: { app.kubernetes.io/name: document-viewer, app.kubernetes.io/component: worker } }

@@ -149,6 +149,83 @@ kubectl -n viewer get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{
   - Set short retention (hours, not days) on raw access logs and post-process
     them into redacted forms for long-term storage.
 
+## Rate limiting
+
+The viewer applies an optional per-`jti` soft cap (`RATE_LIMIT_PER_JTI`,
+default 0 = off). Ingress-level limits remain the primary control — a stolen
+URL plus a still-valid `exp` is replayable until the token expires, so capping
+request volume per source and per token is the only backstop against runaway
+re-fetch loops or credential-stuffing-style probes.
+
+Minimum recommended limits at the ingress:
+
+| Surface | Limit | Why |
+|---|---|---|
+| Per source IP (or zero-trust identity) | 100 req/min | A normal reviewer session generates ~N page requests for a single open document, not hundreds. |
+| Per `jti` URL segment | 200 req/15 min | Bounds the impact of a single leaked token; aligns with the design-target `exp` window. |
+| `/render/*` 4xx burst | Trigger temporary block after 30 4xx/min | Probing and brute-forcing both surface as rapid 4xx streams. |
+
+### nginx example
+
+```nginx
+# Per-IP rate limit zone (10 MB ~ 160k IPs tracked).
+limit_req_zone $binary_remote_addr zone=viewer_ip:10m rate=100r/m;
+
+# Per-token rate limit zone — extracts the `jti`-bearing path segment from
+# /render/<jwt>/ ... or /embed/<jwt>. Use the JWT payload only as a coarse
+# bucket; do not log the captured string anywhere.
+map $request_uri $viewer_token_bucket {
+    ~^/(render|embed)/(?<tok>[A-Za-z0-9._\-]+) $tok;
+    default                                    "";
+}
+limit_req_zone $viewer_token_bucket zone=viewer_tok:10m rate=200r/15m;
+
+server {
+    server_name viewer.example.com;
+    location ~ ^/(render|embed)/ {
+        limit_req zone=viewer_ip  burst=20 nodelay;
+        limit_req zone=viewer_tok burst=30 nodelay;
+        limit_req_status 429;
+        proxy_pass http://viewer-api;
+        # Strip the URL path from access logs (see "Ingress logs" above).
+    }
+}
+```
+
+### Kubernetes ingress-nginx example
+
+Annotations on the `Ingress` object — typically applied via an environment
+overlay rather than to the chart's stock `api-ingress.yaml`:
+
+```yaml
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rpm: "100"        # per source IP
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "3"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+```
+
+For per-`jti` bucketing, ingress-nginx requires a snippet — prefer Traefik's
+`RateLimit` middleware or an Envoy filter when fine-grained per-token limits
+matter.
+
+### Application-side per-jti cap
+
+Set `config.rateLimitPerJti` in the Helm values (or `RATE_LIMIT_PER_JTI` env
+var) to a non-zero value to enable the application-side backstop. The viewer
+counts requests by `jti` in Redis with a `rateLimitWindowSeconds` window. When
+the cap is exceeded, the API returns 429 with a `Retry-After` header. This is
+not a substitute for ingress limiting — it does not bound traffic that never
+hits the API (e.g., SYN floods) — but it provides defense in depth when
+ingress is misconfigured.
+
+### Observability
+
+- **Alert on 429 rate** crossing 1% of `/render/*` traffic for >5 minutes.
+- **Bucket 429s by source IP** in the SIEM. A single IP dominating the 429
+  stream is usually a misbehaving integration; broad distribution is the abuse
+  case.
+
 ## Operational maintenance
 
 - [ ] **Quarterly key rotation drill.** Practise rotating the JWT signing

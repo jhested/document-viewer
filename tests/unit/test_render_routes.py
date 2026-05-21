@@ -12,12 +12,15 @@ from fastapi.testclient import TestClient
 from document_viewer.api.deps import (
     get_arq_pool,
     get_jwt_verifier,
+    get_rate_limiter,
     get_replay_guard,
     get_settings,
 )
+from document_viewer.api.middleware import install_middleware
 from document_viewer.api.routes.render import router
 from document_viewer.shared.config import Settings
 from document_viewer.shared.jwt_auth import JwtVerifier
+from document_viewer.shared.ratelimit import JtiRateLimiter
 
 SECRET = "test-secret-must-be-at-least-32-bytes-long!!"
 
@@ -39,6 +42,7 @@ def _token(**overrides: object) -> str:
 @pytest.fixture
 def client() -> TestClient:
     app = FastAPI()
+    install_middleware(app)
     app.include_router(router)
 
     settings = Settings(
@@ -67,6 +71,9 @@ def client() -> TestClient:
     )
     app.dependency_overrides[get_arq_pool] = lambda: arq
     app.dependency_overrides[get_replay_guard] = lambda: replay
+    app.dependency_overrides[get_rate_limiter] = lambda: JtiRateLimiter(
+        MagicMock(), limit=0, window_seconds=60
+    )
     return TestClient(app)
 
 
@@ -94,6 +101,25 @@ def test_page_returns_webp_and_no_store(client: TestClient) -> None:
     assert r.headers["Content-Type"] == "image/webp"
     assert r.headers["Cache-Control"] == "no-store"
     assert r.content.startswith(b"RIFF")
+
+
+def test_rate_limit_returns_429_with_retry_after(client: TestClient) -> None:
+    """When the per-jti limiter blocks, the response is 429 with Retry-After."""
+    from document_viewer.shared.errors import RateLimitExceeded
+
+    class _Blocked:
+        @property
+        def enabled(self) -> bool:
+            return True
+
+        async def check(self, jti: str) -> None:
+            raise RateLimitExceeded(retry_after=42)
+
+    client.app.dependency_overrides[get_rate_limiter] = lambda: _Blocked()
+    r = client.get(f"/render/{_token()}/manifest")
+    assert r.status_code == 429
+    assert r.headers["Retry-After"] == "42"
+    assert r.json()["error"] == "rate limit exceeded"
 
 
 def test_page_caps_width(client: TestClient) -> None:
