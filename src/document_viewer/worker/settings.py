@@ -1,16 +1,42 @@
 """arq WorkerSettings + the `viewer-worker` entrypoint."""
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from arq.connections import RedisSettings
 
+from document_viewer.render.gotenberg_client import GotenbergClient
+from document_viewer.render.pipeline import RenderPipeline
 from document_viewer.shared.config import Settings
 from document_viewer.shared.logging import configure_logging
+from document_viewer.shared.source import (
+    FilesystemBackend,
+    S3Backend,
+    SourceBackend,
+)
+from document_viewer.shared.watermark import WatermarkConfig
 
 
 def _redis_settings(s: Settings) -> RedisSettings:
     return RedisSettings.from_dsn(s.redis_url)
+
+
+def _build_source(s: Settings) -> SourceBackend:
+    if s.source_backend == "fs":
+        return FilesystemBackend(root=s.fs_root)
+    return S3Backend(
+        bucket=s.s3_bucket or "",
+        region=s.s3_region,
+        endpoint_url=s.s3_endpoint,
+        access_key_id=(
+            s.s3_access_key_id.get_secret_value() if s.s3_access_key_id else None
+        ),
+        secret_access_key=(
+            s.s3_secret_access_key.get_secret_value()
+            if s.s3_secret_access_key
+            else None
+        ),
+    )
 
 
 class WorkerSettings:
@@ -19,8 +45,25 @@ class WorkerSettings:
     functions: ClassVar[list[object]] = []  # populated below, after jobs loads
 
     @staticmethod
-    def on_startup(ctx: dict[str, object]) -> None:
+    async def on_startup(ctx: dict[str, Any]) -> None:
         configure_logging(level="INFO")
+        # Job functions read settings/source/pipeline from ctx; arq itself only
+        # provides ctx["redis"] (the queue pool, which we also reuse as cache).
+        s = Settings()  # type: ignore[call-arg]  # fields loaded from env
+        ctx["settings"] = s
+        ctx["source"] = _build_source(s)
+        ctx["pipeline"] = RenderPipeline(
+            gotenberg=GotenbergClient(
+                base_url=s.gotenberg_url,
+                timeout_seconds=s.office_timeout_seconds,
+            ),
+            settings=s,
+            watermark=WatermarkConfig(
+                opacity=s.watermark_opacity,
+                font_size=s.watermark_font_size,
+                angle=s.watermark_angle,
+            ),
+        )
 
 
 # Bind jobs lazily so this module imports cleanly even before T21's jobs.py
